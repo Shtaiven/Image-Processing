@@ -10,7 +10,7 @@ using namespace std;
 
 // function prototype
 void blur(imageP, int, int, imageP);
-void fillPaddedBuffer(uchar*, int, uchar*, int, int);
+void fillPaddedBuffer(uchar*, int, uchar*, int, int, int);
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // main:
@@ -91,7 +91,7 @@ void blur(imageP I1, int xsz, int ysz, imageP I2)
 	// blur horizontally
 	int i;
 	for(y = 0; y < total; y += I1->width) {
-		fillPaddedBuffer(hbuf, hbuf_width, in + y, I1->width, hpad);
+		fillPaddedBuffer(hbuf, hbuf_width, in + y, I1->width, hpad, 0);
 		sum = 0;
 		for(i = -hpad; i <= hpad; ++i) {
 			sum += hbuf[hpad+i];
@@ -111,7 +111,9 @@ void blur(imageP I1, int xsz, int ysz, imageP I2)
 //
 // Fills a single buffer with padding for use by blur().
 //
-void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad)
+// offset is the distance between array elements we want in the buffer.
+// insz is the width or height of the image.
+void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad, int offset)
 {
 	// padding (value extension) + copy array + padding (value extension)
 	int i;
@@ -120,6 +122,6 @@ void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad)
 		buffer[bsz - i - 1] = in[insz - 1]; // pad end of buffer with last value of in[]
 	}
 	for(i = 0; i < insz; ++i) {
-		buffer[pad + i] = in[i]; // insert in[] in between padding
+		buffer[pad + i] = in[i + offset]; // insert in[] in between padding
 	}
 }
