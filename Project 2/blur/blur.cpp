@@ -62,7 +62,7 @@ int main(int argc, char** argv)
 void blur(imageP I1, int xsz, int ysz, imageP I2)
 {
 
-	int	     x, y;
+	int	     i, j, x, y;
 	uchar    *in, *out, sum;
 
 	// total number of pixels in image
@@ -87,9 +87,8 @@ void blur(imageP I1, int xsz, int ysz, imageP I2)
 	int vbuf_width = I1->height + (ysz-1); // ysz-1 accounts for padding on both sides
 	uchar hbuf[hbuf_width]; // initialize horizontal buffer
 	uchar vbuf[vbuf_width]; // initialize vertican buffer
-
+/*
 	// blur horizontally
-	int i;
 	for(y = 0; y < total; y += I1->width) {
 		fillPaddedBuffer(hbuf, hbuf_width, in + y, I1->width, hpad, 0);
 		sum = 0;
@@ -101,9 +100,30 @@ void blur(imageP I1, int xsz, int ysz, imageP I2)
 			sum += (hbuf[x+xsz]-hbuf[x]);
 		}
 	}
+*/
+/*
+	in = out; //store horizontally blurred output into in[] and vertically blur that output
 
 	// blur vertically
-
+	for(x = 0; x < I1->width; ++x) {
+		fillPaddedBuffer(vbuf, vbuf_width, in + x, I1->height, vpad, I1->width);
+		sum = 0;
+		for(i = -vpad; i <= vpad; ++i) {
+			sum += vbuf[vpad+i];
+		}
+		for(y = j = 0; y < total; y += I1->width) {
+			out[x+y] = sum/ysz;
+			sum += (vbuf[++j+ysz]-hbuf[j]);
+		}
+	}
+*/
+/*
+	// debug
+	uchar B[24];
+	uchar A[4] = {1, 2, 3, 4};
+	fillPaddedBuffer(B, sizeof(B), A, sizeof(A), 10, 0);
+	for(i = 0; i < sizeof(B); ++i) {printf("%d", B[i]);}
+*/
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -122,6 +142,6 @@ void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad, int 
 		buffer[bsz - i - 1] = in[insz - 1]; // pad end of buffer with last value of in[]
 	}
 	for(i = 0; i < insz; ++i) {
-		buffer[pad + i] = in[i + offset]; // insert in[] in between padding
+		buffer[pad + i] = in[i + offset]; // insert in[] into buffer[] in between padding
 	}
 }
