@@ -1,5 +1,6 @@
 #include "IP.h"
 #include <vector>
+#include <algorithm>
 using namespace std;
 
 // function prototype
@@ -49,8 +50,26 @@ int main(int argc, char** argv)
 }
 
 void median(imageP I1, int xsz, int avg_nbrs, imageP I2) {
-	int i, j, currentRow, currentCol;
+
+	// total number of pixels in image
+	int total = I1->width * I1->height;
+	
+
+	// init I2 dimensions and buffer
+	I2->width = I1->width;
+	I2->height = I1->height;
+	I2->image = (uchar *)malloc(total);
+	if (I2->image == NULL) {
+		cerr << "blur: insufficient memory\n";
+		exit(1);
+	}
+
+
+	// init variables
+	int i, j, currentRow, currentCol, sum;
 	int	padsz = (xsz-1)/2;
+	int medianIndex = (xsz*xsz-1)/2;
+	int denominator = 2*avg_nbrs + 1;
 	vector<uchar> medianVector;
 
 	// init buffer to be used by cbuf
@@ -65,11 +84,17 @@ void median(imageP I1, int xsz, int avg_nbrs, imageP I2) {
 		// pass the kernel through the buffer
 		for (currentCol = 0; currentCol < I1->width; ++currentCol) {
 			medianVector.clear();
+			sum = 0;
 			for (i = 0; i < xsz; ++i) {
 				for (j = -padsz; j <= padsz; ++j) {
-					medianVector.push_back(buffer[i][j + currentCol]);	
+					medianVector.push_back(buffer[i][j + currentCol + padsz]);
 				}
 			}
+			sort(medianVector.begin(), medianVector.end());
+			for (i = -avg_nbrs; i <= avg_nbrs; ++i) {
+				sum += medianVector[i + medianIndex];
+			}
+			I2->image[currentRow*I1->width + currentCol] = sum/denominator;
 		}
 	}
 }
@@ -79,6 +104,7 @@ void median(imageP I1, int xsz, int avg_nbrs, imageP I2) {
 // cbuf:
 //
 // Circular buffer implementation.
+//
 void cbuf(uchar** buffer, imageP image, int currentRow, int padsz, int xsz) {
 	int i;
 	if(currentRow == 0) { // need to pad top if at beginning on the image
@@ -113,6 +139,7 @@ void cbuf(uchar** buffer, imageP image, int currentRow, int padsz, int xsz) {
 // Fills a single buffer with padding for use by blur().
 //
 // insz is the width or height of the image.
+//
 void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad)
 {
 	// padding (value extension) + copy array + padding (value extension)
