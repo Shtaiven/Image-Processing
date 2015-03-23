@@ -10,7 +10,7 @@ using namespace std;
 
 // function prototype
 void blur(imageP, int, int, imageP);
-void fillPaddedBuffer(uchar*, int, uchar*, int, int, int);
+void fillPaddedBuffer(uchar*, int, uchar*, int, int);
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // main:
@@ -38,7 +38,7 @@ int main(int argc, char** argv)
 
 	// error checking: xsz and ysz are odd
 	if (xsz % 2 == 0 || ysz % 2 == 0) {
-		cerr << "xsz and ysz must be odd\n";
+		cerr << "blur: xsz and ysz must be odd\n";
 		exit(1);
 	}
 
@@ -86,42 +86,54 @@ void blur(imageP I1, int xsz, int ysz, imageP I2)
 	int hbuf_width = I1->width + (xsz-1); // xsz-1 accounts for padding on both sides
 	int vbuf_width = I1->height + (ysz-1); // ysz-1 accounts for padding on both sides
 	uchar hbuf[hbuf_width]; // initialize horizontal buffer
-	uchar vbuf[vbuf_width]; // initialize vertican buffer
-/*
+	uchar vbuf[vbuf_width]; // initialize vertical buffer
+	uchar temp_in[I1->height]; // used the make vertical blur simpler ot implement
+
 	// blur horizontally
 	for(y = 0; y < total; y += I1->width) {
-		fillPaddedBuffer(hbuf, hbuf_width, in + y, I1->width, hpad, 0);
+		fillPaddedBuffer(hbuf, sizeof(hbuf), in + y, I1->width, hpad); // pads our input row of the image and puts it in a temp buffer
+
 		sum = 0;
-		for(i = -hpad; i <= hpad; ++i) {
+		for(i = -hpad; i <= hpad; ++i) { // start computing the sum within the horizonal kernel area (starting from the left of the image)
 			sum += hbuf[hpad+i];
 		}
+		//printf("initial sum: %d\n", sum); // debug
 		for(x = 0; x < I1->width; ++x) {
 			out[x+y] = sum/xsz;
 			sum += (hbuf[x+xsz]-hbuf[x]);
+		//	printf("next sum: %d\n", sum); //debug
 		}
 	}
-*/
-/*
-	in = out; //store horizontally blurred output into in[] and vertically blur that output
+
+	//store horizontally blurred output into in[] and vertically blur that output
+	for(i = 0; i < sizeof(in); ++i) {
+		in[i] = out[i];
+	}
 
 	// blur vertically
 	for(x = 0; x < I1->width; ++x) {
-		fillPaddedBuffer(vbuf, vbuf_width, in + x, I1->height, vpad, I1->width);
+
+		// fill temp_in with a column of the image
+		for (i = 0; i < I1->height; ++i) {
+			temp_in[i] = in[x+(i*I1->width)]; // x is the column, k*I1->width is how far the next pixel in the column is from the first
+		}
+
+		fillPaddedBuffer(vbuf, sizeof(vbuf), temp_in, sizeof(temp_in), vpad); // pads our input column of the image and puts it in a temp buffer
 		sum = 0;
 		for(i = -vpad; i <= vpad; ++i) {
 			sum += vbuf[vpad+i];
 		}
 		for(y = j = 0; y < total; y += I1->width) {
 			out[x+y] = sum/ysz;
-			sum += (vbuf[++j+ysz]-hbuf[j]);
+			sum += (vbuf[++j+ysz]-vbuf[j]);
 		}
 	}
-*/
+
 /*
 	// debug
-	uchar B[24];
-	uchar A[4] = {1, 2, 3, 4};
-	fillPaddedBuffer(B, sizeof(B), A, sizeof(A), 10, 0);
+	uchar B[9];
+	uchar A[6] = {1, 2, 3, 4, 5, 6};
+	fillPaddedBuffer(B, sizeof(B), A, sizeof(A), 3);
 	for(i = 0; i < sizeof(B); ++i) {printf("%d", B[i]);}
 */
 }
@@ -133,7 +145,7 @@ void blur(imageP I1, int xsz, int ysz, imageP I2)
 //
 // offset is the distance between array elements we want in the buffer.
 // insz is the width or height of the image.
-void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad, int offset)
+void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad)
 {
 	// padding (value extension) + copy array + padding (value extension)
 	int i;
@@ -142,6 +154,6 @@ void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad, int 
 		buffer[bsz - i - 1] = in[insz - 1]; // pad end of buffer with last value of in[]
 	}
 	for(i = 0; i < insz; ++i) {
-		buffer[pad + i] = in[i + offset]; // insert in[] into buffer[] in between padding
+		buffer[pad + i] = in[i]; // insert in[] into buffer[] in between padding
 	}
 }
