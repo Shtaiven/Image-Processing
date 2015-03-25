@@ -60,7 +60,7 @@ void median(imageP I1, int xsz, int avg_nbrs, imageP I2) {
 	I2->height = I1->height;
 	I2->image = (uchar *)malloc(total);
 	if (I2->image == NULL) {
-		cerr << "blur: insufficient memory\n";
+		cerr << "median: insufficient memory\n";
 		exit(1);
 	}
 
@@ -87,7 +87,7 @@ void median(imageP I1, int xsz, int avg_nbrs, imageP I2) {
 			sum = 0;
 			for (i = 0; i < xsz; ++i) {
 				for (j = -padsz; j <= padsz; ++j) {
-					medianVector.push_back(buffer[i][j + currentCol + padsz]);
+					medianVector.push_back(buffer[i][j + currentCol + padsz]); // might need to fix this line. Remove padsz?
 				}
 			}
 			sort(medianVector.begin(), medianVector.end());

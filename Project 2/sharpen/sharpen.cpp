@@ -3,7 +3,8 @@
 #include <algorithm>
 using namespace std;
 
-// function prototype
+// function prototypes
+void sharpen(imageP, int, int, imageP);
 void blur(imageP, int, int, imageP);
 void cbuf(uchar**, imageP, int, int, int, int, int);
 void fillPaddedBuffer(uchar*, int, uchar*, int, int);
@@ -15,12 +16,12 @@ void fillPaddedBuffer(uchar*, int, uchar*, int, int);
 //
 int main(int argc, char** argv)
 {
-	int       xsz, ysz;
+	int       sz, fctr;
 	imageP    I1, I2;
 
 	// error checking: proper usage
 	if (argc != 5) {
-		cerr << "Usage: blur infile xsz ysz outfile\n";
+		cerr << "Usage: sharpen infile sz fctr outfile\n";
 		exit(1);
 	}
 
@@ -28,18 +29,18 @@ int main(int argc, char** argv)
 	I1 = IP_readImage(argv[1]);
 	I2 = NEWIMAGE;
 
-	// read xsize and ysize
-	xsz = atoi(argv[2]);
-	ysz = atoi(argv[3]);
+	// read sz and fctr
+	sz = atoi(argv[2]);
+	fctr = atoi(argv[3]);
 
-	// error checking: xsz and ysz are odd
-	if (xsz % 2 == 0 || ysz % 2 == 0) {
-		cerr << "blur: xsz and ysz must be odd\n";
+	// error checking: sz is odd
+	if (sz % 2 == 0) {
+		cerr << "sharpen: sz must be odd\n";
 		exit(1);
 	}
 
 	// call median and save result in file
-	blur(I1, xsz, ysz, I2);
+	sharpen(I1, sz, fctr, I2);
 	IP_saveImage(I2, argv[4]);
 
 	// free up image structures/memory
@@ -49,6 +50,42 @@ int main(int argc, char** argv)
 	return 1;
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Sharpen:
+//
+// Sharpen implementation.
+//
+void sharpen(imageP I1, int sz, int fctr, imageP I2) {
+	// TODO: write function
+	/*
+		1. Blur input image I1 into I2 with xsz = ysz = sz
+		2. Subtract blur image (stored in I2) from I1 and store in I2. Make sure to clip values [0, 255]
+		3. Scale I2 by fctr
+		4. Add I1 to I2
+	*/
+	// init variables
+	int total = I1->width * I1->height;
+	int i;
+	float p;
+
+	// Blur input image I1 into I2 with xsz = ysz = sz
+	blur(I1, sz, sz, I2);
+
+	// Subtract blur image (stored in I2) from I1 and store in I2. Clip values to [0, 255] and scale I2 by fctr
+	for (i = 0; i < total; ++i) {
+		p = (float) fctr * (I1->image[i] - I2->image[i]);
+		p += (float) I1->image[i];
+		if (p < 0) I2->image[i] = 0;
+		else if (p > 255) I2->image[i] = 255;
+		else I2->image[i] = (uchar) p;
+	}
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// blur:
+//
+// Blur implementation.
+//
 void blur(imageP I1, int xsz, int ysz, imageP I2) {
 
 	// total number of pixels in image
@@ -109,10 +146,10 @@ void cbuf(uchar** buffer, imageP image, int currentRow, int xpadsz, int ypadsz, 
 	int i;
 	if(currentRow == 0) { // need to pad top if at beginning on the image with ypadsz rows
 		for(i = 0; i < ypadsz; ++i) {
-			fillPaddedBuffer(buffer[i], sizeof(buffer[i]), image->image, image->width, xpadsz); // top padded rows
-			fillPaddedBuffer(buffer[i+ypadsz+1], sizeof(buffer[i]), image->image + i*image->width, image->width, xpadsz); // rows after first
+			fillPaddedBuffer(buffer[i], sizeof(buffer[i]), image->image, image->width, xpadsz); // create top padding rows
+			fillPaddedBuffer(buffer[i+ypadsz+1], sizeof(buffer[i]), image->image + i*image->width, image->width, xpadsz); // pad rows after first
 		}
-		fillPaddedBuffer(buffer[ypadsz], sizeof(buffer[i]), image->image, image->width, xpadsz); // first row
+		fillPaddedBuffer(buffer[ypadsz], sizeof(buffer[i]), image->image, image->width, xpadsz); // pad first row of input image
 	}
 	else if(currentRow >= image->height - ypadsz) { // need to pad bottom of image if close to bottom of image
 		uchar* temp_buf = buffer[0];
