@@ -1,17 +1,21 @@
+// ============================================================================
+// blur.cpp - Blurring program.
+// Copyright (C) 2015 by Rosario Antunez, Steven Eisinger, and Ethan Graber
+//
+// Written by: Rosario Antunez, Steven Eisinger, and Ethan Graber, 2015
+// ============================================================================
+
 #include "IP.h"
-#include <vector>
-#include <algorithm>
 using namespace std;
 
 // function prototype
 void blur(imageP, int, int, imageP);
-void cbuf(uchar**, imageP, int, int, int, int, int);
 void fillPaddedBuffer(uchar*, int, uchar*, int, int);
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // main:
 //
-// Main routine.
+// Main routine to blur image.
 //
 int main(int argc, char** argv)
 {
@@ -38,7 +42,7 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 
-	// call median and save result in file
+	// blur image and save result in file
 	blur(I1, xsz, ysz, I2);
 	IP_saveImage(I2, argv[4]);
 
@@ -49,7 +53,17 @@ int main(int argc, char** argv)
 	return 1;
 }
 
-void blur(imageP I1, int xsz, int ysz, imageP I2) {
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// blur:
+//
+// Blurs the image using a kernel of size xsz*ysz
+//
+void blur(imageP I1, int xsz, int ysz, imageP I2)
+{
+
+	int	     i, j, sum, currentColumn, currentRow;
+	uchar    *in, *out;
 
 	// total number of pixels in image
 	int total = I1->width * I1->height;
@@ -64,71 +78,55 @@ void blur(imageP I1, int xsz, int ysz, imageP I2) {
 		exit(1);
 	}
 
+	// init horizontal and vertical blur buffers
+	in                         = I1->image;            // input  image buffer
+	out                        = I2->image;            // output image buffer
+	int hpad                   = (xsz-1)/2;            // calculate horizontal padding
+	int vpad                   = (ysz-1)/2;            // calculate vertical padding
+	int hbuf_width             = I1->width + (xsz-1);  // xsz-1 accounts for padding on both sides
+	int vbuf_width             = I1->height + (ysz-1); // ysz-1 accounts for padding on both sides
+	float p;				   // stores value of output pixel
+	uchar hbuf[hbuf_width];    // initialize horizontal buffer
+	uchar vbuf[vbuf_width];    // initialize vertical buffer
+	uchar temp_in[I1->height]; // used the make vertical blur simpler ot implement
 
-	// init variables
-	int i, j, currentRow, currentCol, sum;
-	int	xpadsz = (xsz-1)/2;
-	int ypadsz = (ysz-1)/2;
-	//int medianIndex = (xsz*ysz-1)/2;
-	//int denominator = 2*avg_nbrs + 1;
-	vector<uchar> blurVector;
-
-	// init buffer to be used by cbuf
-	uchar** buffer = new uchar*[xsz];
-	for (i = 0; i < ysz; ++i) {
-		buffer[i] = new uchar[I1->width + xsz - 1];
-	}
-
-	// run the kernel over the circular buffer
-	for (currentRow = 0; currentRow < I1->height; ++currentRow) {
-		cbuf(buffer, I1, currentRow, xpadsz, ypadsz, xsz, ysz);
-		// pass the kernel through the buffer
-		for (currentCol = 0; currentCol < I1->width; ++currentCol) {
-			blurVector.clear();
-			sum = 0;
-			for (i = 0; i < ysz; ++i) {
-				for (j = 0; j <= sizeof(buffer[i])-xsz; ++j) {
-					blurVector.push_back(buffer[i][j + currentCol + xpadsz]);
-				}
-			}
-			//sort(medianVector.begin(), medianVector.end());
-			for (i = 0; i <= sizeof(blurVector); ++i) {
-				sum += blurVector[i];
-			}
-			I2->image[currentRow*I1->width + currentCol] = sum/sizeof(blurVector);
+	// blur horizontally
+	for(currentRow = 0; currentRow < I1->height; ++currentRow) {
+		fillPaddedBuffer(hbuf, sizeof(hbuf), in + (currentRow * I1->width), I1->width, hpad); // pads our input row of the image and puts it in a temp buffer
+		sum = 0;
+		for(i = -hpad; i <= hpad; ++i) { // start computing the sum within the horizonal kernel area (starting from the left of the image)
+			sum += (int) hbuf[hpad+i];
+		}
+		for(currentColumn = 0; currentColumn < I1->width; ++currentColumn) {
+			p = (float) sum/xsz;
+			out[currentColumn + (currentRow * I1->width)] = (uchar) p;
+			sum += ((int) hbuf[currentColumn+xsz] - (int) hbuf[currentColumn]);
 		}
 	}
-}
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// cbuf:
-//
-// Circular buffer implementation.
-//
-void cbuf(uchar** buffer, imageP image, int currentRow, int xpadsz, int ypadsz, int xsz, int ysz) {
-	int i;
-	if(currentRow == 0) { // need to pad top if at beginning on the image with ypadsz rows
-		for(i = 0; i < ypadsz; ++i) {
-			fillPaddedBuffer(buffer[i], sizeof(buffer[i]), image->image, image->width, xpadsz); // top padded rows
-			fillPaddedBuffer(buffer[i+ypadsz+1], sizeof(buffer[i]), image->image + i*image->width, image->width, xpadsz); // rows after first
-		}
-		fillPaddedBuffer(buffer[ypadsz], sizeof(buffer[i]), image->image, image->width, xpadsz); // first row
+	//store horizontally blurred output into in[] and vertically blur that output
+	for(i = 0; i < sizeof(in); ++i) {
+		in[i] = out[i];
 	}
-	else if(currentRow >= image->height - ypadsz) { // need to pad bottom of image if close to bottom of image
-		uchar* temp_buf = buffer[0];
-		for(i = 0; i < ysz - 1; ++i) {
-			buffer[i] = buffer[i+1];
+
+	// blur vertically
+	for(currentColumn = 0; currentColumn < I1->width; ++currentColumn) {
+
+		// fill temp_in with a column of the image: {x, x+w, x+2w, x+3w, .. , x+(h-1)*w}
+		for (i = 0; i < I1->height; ++i) {
+			temp_in[i] = in[currentColumn+(i*I1->width)]; // i*I1->width is how far the next pixel in the column is from the first
 		}
-		buffer[xsz] = temp_buf;
-		fillPaddedBuffer(buffer[ysz], sizeof(buffer[ysz]), image->image + (image->height - 1)*image->width, image->width, xpadsz); //
-	}
-	else {
-		uchar* temp_buf = buffer[0];
-		for(i = 0; i < ysz - 1; ++i) {
-			buffer[i] = buffer[i+1];
+
+		fillPaddedBuffer(vbuf, sizeof(vbuf), temp_in, sizeof(temp_in), vpad); // pads our input column of the image and puts it in a temp buffer
+		sum = 0;
+		for(i = -vpad; i <= vpad; ++i) {
+			sum += (int) vbuf[vpad+i];
 		}
-		buffer[ysz] = temp_buf;
-		fillPaddedBuffer(buffer[ysz], sizeof(buffer[ysz]), image->image + (currentRow + xpadsz)*image->width, image->width, xpadsz);
+		for(currentRow = 0; currentRow < I1->height; ++currentRow) {
+			p = (float) sum/ysz;
+			out[currentColumn + (currentRow * I1->width)] = (uchar) p;
+			sum += ((int) vbuf[currentRow+ysz] - (int) vbuf[currentRow]);
+		}
 	}
 }
 
@@ -138,7 +136,6 @@ void cbuf(uchar** buffer, imageP image, int currentRow, int xpadsz, int ypadsz, 
 // Fills a single buffer with padding for use by blur().
 //
 // insz is the width or height of the image.
-//
 void fillPaddedBuffer(uchar *buffer, int bsz, uchar *in, int insz, int pad)
 {
 	// padding (value extension) + copy array + padding (value extension)
